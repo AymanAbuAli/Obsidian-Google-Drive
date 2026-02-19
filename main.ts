@@ -21,6 +21,7 @@ interface PluginSettings {
 	driveIdToPath: Record<string, string>;
 	lastSyncedAt: number;
 	changesToken: string;
+	pushOnShutdown: boolean;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -29,6 +30,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
 	driveIdToPath: {},
 	lastSyncedAt: 0,
 	changesToken: "",
+	pushOnShutdown: false,
 };
 
 export default class ObsidianGoogleDrive extends Plugin {
@@ -111,7 +113,12 @@ export default class ObsidianGoogleDrive extends Plugin {
 		});
 
 		this.registerEvent(
-			this.app.workspace.on("quit", () => this.saveSettings())
+			this.app.workspace.on("quit", async () => {
+				if (this.settings.pushOnShutdown) {
+					await push(this, true);
+				}
+				await this.saveSettings();
+			})
 		);
 
 		this.app.workspace.onLayoutReady(() =>
@@ -374,5 +381,18 @@ class SettingsTab extends PluginSettingTab {
 						);
 					});
 			});
+		new Setting(containerEl)
+			.setName("Push to Google Drive on shutdown")
+			.setDesc(
+				"Automatically push changes to Google Drive when Obsidian closes. This will skip the confirmation modal."
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.pushOnShutdown)
+					.onChange(async (value) => {
+						this.plugin.settings.pushOnShutdown = value;
+						await this.plugin.saveSettings();
+					})
+			);
 	}
 }
